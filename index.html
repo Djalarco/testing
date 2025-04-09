@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interval Academy - Piano Pitch Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .genially-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .genially-embed {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .piano-detector {
+            background-color: #fff;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .detector-header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .logo {
+            font-weight: bold;
+            font-size: 18px;
+            color: #333;
+        }
+        
+        .status {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #3A80D2;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            gap: 20px;
+        }
+        
+        .result-box {
+            text-align: center;
+            min-width: 80px;
+        }
+        
+        .result-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .result-cents {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .feedback {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 16px;
+            text-align: center;
+            min-height: 25px;
+        }
+        
+        .feedback.correct {
+            background-color: #DFF2BF;
+            color: #4F8A10;
+        }
+        
+        .feedback.close {
+            background-color: #FEEFB3;
+            color: #9F6000;
+        }
+        
+        .feedback.incorrect {
+            background-color: #FFBABA;
+            color: #D8000C;
+        }
+        
+        .piano-keyboard {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+            height: 60px;
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .white-key {
+            width: 35px;
+            height: 100%;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 0 0 3px 3px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .black-key {
+            width: 20px;
+            height: 60%;
+            background-color: #333;
+            position: absolute;
+            z-index: 2;
+            border-radius: 0 0 3px 3px;
+        }
+        
+        .key-name {
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .black-key .key-name {
+            color: white;
+            bottom: 3px;
+            font-size: 8px;
+        }
+        
+        .key-highlight {
+            background-color: #4A90E2;
+            opacity: 0.6;
+        }
+        
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            .piano-detector {
+                padding: 10px;
+            }
+            
+            .results {
+                flex-wrap: wrap;
+            }
+            
+            .result-box {
+                min-width: 60px;
+            }
+            
+            .piano-keyboard {
+                height: 50px;
+                overflow-x: auto;
+                justify-content: flex-start;
+            }
+            
+            .white-key {
+                width: 30px;
+            }
+            
+            .black-key {
+                width: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="genially-container">
+            <iframe 
+                id="geniallyFrame"
+                class="genially-embed"
+                title="Interval Academy" 
+                frameborder="0" 
+                src="https://view.genially.com/67f3461aacde2e2917321344" 
+                allowfullscreen="true" 
+                allowscriptaccess="always" 
+                scrolling="yes" 
+                allownetworking="all">
+            </iframe>
+        </div>
+        
+        <div class="piano-detector">
+            <div class="detector-header">
+                <div class="logo">Interval Academy - Pitch Detector</div>
+                <div class="status" id="status">Ready to listen</div>
+            </div>
+            
+            <div class="controls">
+                <button id="startButton">Start Listening</button>
+                <button id="stopButton" disabled>Stop</button>
+                <button id="calibrateButton">Calibrate</button>
+            </div>
+            
+            <div class="results">
+                <div class="result-box">
+                    <div class="result-label">NOTE</div>
+                    <div class="result-value" id="noteDisplay">--</div>
+                </div>
+                
+                <div class="result-box">
+                    <div class="result-label">FREQUENCY</div>
+                    <div class="result-value" id="frequencyDisplay">--</div>
+                    <div class="result-cents" id="centsDisplay"></div>
+                </div>
+                
+                <div class="result-box">
+                    <div class="result-label">TARGET</div>
+                    <div class="result-value" id="targetDisplay">C4</div>
+                </div>
+            </div>
+            
+            <div class="feedback" id="feedback">Play a note on your piano to begin</div>
+            
+            <div class="piano-keyboard" id="pianoKeyboard">
+                <!-- Piano keys will be generated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Define audio context and analyzer globally
+        let audioContext;
+        let analyzer;
+        let mediaStreamSource;
+        let isListening = false;
+        let targetNote = 'C4';
+        
+        // Piano note frequencies (middle C = C4)
+        const NOTES = {
+            'C2': 65.41, 'C#2': 69.30, 'D2': 73.42, 'D#2': 77.78,
+            'E2': 82.41, 'F2': 87.31, 'F#2': 92.50, 'G2': 98.00,
+            'G#2': 103.83, 'A2': 110.00, 'A#2': 116.54, 'B2': 123.47,
+            'C3': 130.81, 'C#3': 138.59, 'D3': 146.83, 'D#3': 155.56,
+            'E3': 164.81, 'F3': 174.61, 'F#3': 185.00, 'G3': 196.00,
+            'G#3': 207.65, 'A3': 220.00, 'A#3': 233.08, 'B3': 246.94,
+            'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13,
+            'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00,
+            'G#4': 415.30, 'A4': 440.00, 'A#4': 466.16, 'B4': 493.88,
+            'C5': 523.25, 'C#5': 554.37, 'D5': 587.33, 'D#5': 622.25,
+            'E5': 659.26, 'F5': 698.46, 'F#5': 739.99, 'G5': 783.99,
+            'G#5': 830.61, 'A5': 880.00, 'A#5': 932.33, 'B5': 987.77,
+            'C6': 1046.50
+        };
+        
+        // UI Elements
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const calibrateButton = document.getElementById('calibrateButton');
+        const noteDisplay = document.getElementById('noteDisplay');
+        const frequencyDisplay = document.getElementById('frequencyDisplay');
+        const centsDisplay = document.getElementById('centsDisplay');
+        const targetDisplay = document.getElementById('targetDisplay');
+        const feedback = document.getElementById('feedback');
+        const status = document.getElementById('status');
+        const pianoKeyboard = document.getElementById('pianoKeyboard');
+        
+        // Generate piano keyboard
+        function generatePianoKeyboard() {
+            const keyLayout = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octaves = [3, 4, 5]; // Middle octaves
+            let keyboardHtml = '';
+            let blackKeyIndex = 0;
+            
+            octaves.forEach(octave => {
+                keyLayout.forEach((note, index) => {
+                    const fullNote = `${note}${octave}`;
+                    
+                    if (note.includes('#')) {
+                        // Black key
+                        const position = blackKeyIndex * 35 + 22.5;
+                        keyboardHtml += `
+                            <div class="black-key" id="key-${fullNote}" style="left: ${position}px;">
+                                <div class="key-name">${note}</div>
+                            </div>
+                        `;
+                        blackKeyIndex++;
+                    } else {
+                        // White key
+                        keyboardHtml += `
+                            <div class="white-key" id="key-${fullNote}">
+                                <div class="key-name">${note}</div>
+                            </div>
+                        `;
+                        if (note === 'E' || note === 'B') {
+                            blackKeyIndex++; // Skip position for E-F and B-C
+                        }
+                    }
+                });
+            });
+            
+            pianoKeyboard.innerHTML = keyboardHtml;
+        }
+        
+        // Start audio processing
+        async function startListening() {
+            try {
+                // Create audio context if not already created
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Get microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        autoGainControl: false,
+                        noiseSuppression: false,
+                        latency: 0
+                    }
+                });
+                
+                // Create analyzer
+                analyzer = audioContext.createAnalyser();
+                analyzer.fftSize = 2048;
+                
+                // Connect microphone to analyzer
+                mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                mediaStreamSource.connect(analyzer);
+                
+                // Update UI
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                status.textContent = 'Listening to your piano...';
+                
+                // Start detection loop
+                isListening = true;
+                detectPitch();
+                
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                status.textContent = 'Error: Microphone access denied';
+                feedback.textContent = 'Please allow microphone access to use the pitch detector';
+                feedback.className = 'feedback incorrect';
+            }
+        }
+        
+        // Stop audio processing
+        function stopListening() {
+            isListening = false;
+            
+            if (mediaStreamSource) {
+                mediaStreamSource.disconnect();
+            }
+            
+            // Update UI
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            status.textContent = 'Stopped listening';
+            
+            // Reset displays
+            noteDisplay.textContent = '--';
+            frequencyDisplay.textContent = '--';
+            centsDisplay.textContent = '';
+            feedback.textContent = 'Press Start to begin listening again';
+            feedback.className = 'feedback';
+            
+            // Remove highlights from piano
+            document.querySelectorAll('.key-highlight').forEach(el => {
+                el.classList.remove('key-highlight');
+            });
+        }
+        
+        // Main pitch detection loop
+        function detectPitch() {
+            if (!isListening) return;
+            
+            const bufferLength = analyzer.fftSize;
+            const buffer = new Float32Array(bufferLength);
+            analyzer.getFloatTimeDomainData(buffer);
+            
+            // Use autocorrelation to find pitch
+            const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+            
+            if (frequency > 0) {
+                const noteData = getClosestNote(frequency);
+                
+                // Update displays
+                noteDisplay.textContent = noteData.name;
+                frequencyDisplay.textContent = `${Math.round(frequency)} Hz`;
+                centsDisplay.textContent = noteData.cents !== 0 ? `${noteData.cents > 0 ? '+' : ''}${noteData.cents} cents` : 'in tune';
+                
+                // Highlight piano key
+                highlightKey(noteData.name);
+                
+                // Check if note matches target
+                checkNoteMatch(noteData.name);
+                
+                // Attempt to communicate with Genially
+                tryToSendToGenially(noteData.name, frequency, noteData.cents);
+            }
+            
+            // Continue the detection loop
+            requestAnimationFrame(detectPitch);
+        }
+        
+        // Autocorrelation algorithm for pitch detection
+        function autoCorrelate(buffer, sampleRate) {
+            // Find the root mean square (RMS) of the signal
+            let sum = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                sum += buffer[i] * buffer[i];
+            }
+            const rms = Math.sqrt(sum / buffer.length);
+            
+            // Return -1 if signal is too quiet
+            if (rms < 0.01) return -1;
+
+            // Find the correlation
+            let correlation = new Array(buffer.length).fill(0);
+            for (let i = 0; i < buffer.length; i++) {
+                for (let j = 0; j < buffer.length - i; j++) {
+                    correlation[i] += buffer[j] * buffer[j + i];
+                }
+            }
+            
+            // Find the highest correlation peak
+            let maxCorrelation = 0;
+            let maxCorrelationIndex = 0;
+            
+            for (let i = 1; i < correlation.length; i++) {
+                if (correlation[i] > maxCorrelation) {
+                    maxCorrelation = correlation[i];
+                    maxCorrelationIndex = i;
+                }
+            }
+            
+            // Interpolation for better accuracy
+            let y1 = correlation[maxCorrelationIndex - 1];
+            let y2 = correlation[maxCorrelationIndex];
+            let y3 = correlation[maxCorrelationIndex + 1];
+            
+            let a = (y1 + y3 - 2 * y2) / 2;
+            let b = (y3 - y1) / 2;
+            
+            if (a) {
+                maxCorrelationIndex = maxCorrelationIndex - b / (2 * a);
+            }
+            
+            const frequency = sampleRate / maxCorrelationIndex;
+            
+            // Return frequency within piano range
+            return (frequency > 27.5 && frequency < 4186.0) ? frequency : -1;
+        }
+        
+        // Find the closest musical note to a frequency
+        function getClosestNote(frequency) {
+            let closestNote = null;
+            let closestDistance = Infinity;
+            
+            for (const [noteName, noteFreq] of Object.entries(NOTES)) {
+                const distance = Math.abs(Math.log2(frequency / noteFreq));
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestNote = { name: noteName, frequency: noteFreq };
+                }
+            }
+            
+            // Calculate cents deviation
+            const cents = Math.round(1200 * Math.log2(frequency / closestNote.frequency));
+            
+            return {
+                name: closestNote.name,
+                frequency: closestNote.frequency,
+                cents: cents
+            };
+        }
+        
+        // Highlight the played key on the piano keyboard
+        function highlightKey(noteName) {
+            // Remove previous highlights
+            document.querySelectorAll('.key-highlight').forEach(el => {
+                el.classList.remove('key-highlight');
+            });
+            
+            // Add highlight to current key
+            const keyElement = document.getElementById(`key-${noteName}`);
+            if (keyElement) {
+                keyElement.classList.add('key-highlight');
+            }
+        }
+        
+        // Check if the played note matches the target note
+        function checkNoteMatch(noteName) {
+            if (noteName === targetNote) {
+                feedback.textContent = 'Correct! You played the target note!';
+                feedback.className = 'feedback correct';
+            } else {
+                // Check if it's the right note but wrong octave
+                const playedNoteLetter = noteName.slice(0, -1);
+                const targetNoteLetter = targetNote.slice(0, -1);
+                
+                if (playedNoteLetter === targetNoteLetter) {
+                    feedback.textContent = 'Close! Right note but wrong octave.';
+                    feedback.className = 'feedback close';
+                } else {
+                    feedback.textContent = `Try again. Target note is ${targetNote}.`;
+                    feedback.className = 'feedback incorrect';
+                }
+            }
+        }
+        
+        // Try to communicate with the Genially iframe
+        function tryToSendToGenially(note, frequency, cents) {
+            try {
+                const iframe = document.getElementById('geniallyFrame');
+                const message = {
+                    type: 'PITCH_DETECTED',
+                    source: 'INTERVAL_ACADEMY',
+                    data: {
+                        note: note,
+                        frequency: frequency,
+                        cents: cents,
+                        timestamp: Date.now()
+                    }
+                };
+                
+                iframe.contentWindow.postMessage(message, '*');
+            } catch (error) {
+                // Silently fail if communication not possible
+                console.log('Could not communicate with Genially');
+            }
+        }
+        
+        // Change the target note (for testing purposes)
+        function changeTargetNote(note) {
+            targetNote = note;
+            targetDisplay.textContent = note;
+            feedback.textContent = `Play ${note} on your piano`;
+            feedback.className = 'feedback';
+        }
+        
+        // Set up event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            generatePianoKeyboard();
+            
+            // Button events
+            startButton.addEventListener('click', startListening);
+            stopButton.addEventListener('click', stopListening);
+            
+            // Calibrate button - changes the target note for testing
+            calibrateButton.addEventListener('click', () => {
+                const notes = Object.keys(NOTES);
+                const randomNote = notes[Math.floor(Math.random() * notes.length)];
+                changeTargetNote(randomNote);
+            });
+            
+            // Listen for messages from Genially
+            window.addEventListener('message', (event) => {
+                try {
+                    const message = event.data;
+                    
+                    if (message && message.source === 'GENIALLY' && message.type === 'SET_TARGET_NOTE') {
+                        changeTargetNote(message.data.note);
+                    }
+                } catch (error) {
+                    console.error('Error processing message from Genially:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
